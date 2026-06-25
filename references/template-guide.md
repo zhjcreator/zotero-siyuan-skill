@@ -1,139 +1,55 @@
-# 笔记模板设计
+# AI/ML 论文笔记模板
 
 ## 设计原则
 
-1. **与 siyuan-plugin-citation 兼容**：模板头部使用插件标准字段，确保文献池能正确识别
-2. **信息分层清晰**：元数据 / 原文摘要 / AI 分析 / 用户笔记，各层分明
-3. **超链可操作**：每条关键信息都有对应精度的 PDF 跳转链接
-4. **标注优先**：用户已有的 PDF 标注（高亮/批注）自动归入对应区域
+1. **模型架构优先**：backbone/neck/head/损失函数必须逐模块详细描述
+2. **可复现**：参数量、训练超参数、数据集细节完整记录
+3. **结果表格化**：核心结果用表格呈现，一目了然
+4. **每项有 PDF 页码**：`[第N页](zotero://open-pdf/...)` 超链
 
-## 默认模板
+## 模板
 
 ```markdown
-📄 [在 Zotero 中打开 PDF](zotero://open-pdf/library/items/{{pdfKey}})
+### 🎯 一句话总结
+[核心贡献，20 字以内]
 
----
+### 🏗️ 模型架构
+**名称**：[模型名称]
+**整体框架**：[pipeline/end-to-end/two-stage]
+**核心组件**（每项附 [第N页](zotero://...)）：
 
-**Title**:	{{title}}
+- **Backbone**：[ViT-B/16, ResNet-50 等]，输入尺寸/通道
+- **特征提取**：[关键模块1]：[作用 + 维度变换]
+- **核心创新模块**：[详细设计，不少于 80 字]
+- **Head/解码器**：[输出维度，激活函数]
+- **损失函数**：$\mathcal{L}_{total} = ...$ 各分项含义
 
-**Author**:	{{authorString}}
+**参数量/计算量**：[#params, FLOPs]
 
-**Year**:	{{year}}
+### 📊 训练策略
+- 数据集 | 预处理 | 优化器 | lr/batch/epochs | 调度 | 正则化 | 硬件/时间
 
-**DOI**:	[{{doi}}](https://doi.org/{{doi}})
+### 📈 核心结果
+| 任务 | 数据集 | 指标 | 本文 | SOTA |
+表格每行附 [第N页]
 
----
+**关键消融**：[贡献最大的模块]
 
-# 📌 Abstract
+### 🔍 关键引文
+> "原文引用"
+> — [第N页](zotero://...)
 
-{{abstract}}
-
-# 📂 Select on Zotero
-
-[在 Zotero 中定位]({{zoteroSelectURI}})
-
-# 📎 Files
-
-{{files}}
-
-# 📝 Zotero Notes
-
-{{note}}
-
----
-
-## 🔬 研究问题
-
-[AI 基于全文分析总结的研究问题]
-
-## ⚙️ 方法与实验
-
-[AI 基于全文分析的方法总结]
-{{#blueAnnotations}}
-- `{{text}}` [→]({{zoteroOpenURI}})
-{{/blueAnnotations}}
-
-## 💡 核心发现
-
-[AI 基于全文分析和黄色标注的核心发现]
-{{#yellowAnnotations}}
-- `{{text}}` [→]({{zoteroOpenURI}})
-{{/yellowAnnotations}}
-
-## 📖 关键引文
-
-{{#redAnnotations}}
-> {{text}}
-> — [定位]({{zoteroOpenURI}})
-{{/redAnnotations}}
-{{#noteAnnotations}}
-> **标注**: {{comment}}
-> 原文: `{{text}}` — [定位]({{zoteroOpenURI}})
-{{/noteAnnotations}}
-
-## 🤔 思考与疑问
-
-[AI 分析洞察]
-{{#purpleAnnotations}}
-- `{{text}}` [→]({{zoteroOpenURI}})
-{{/purpleAnnotations}}
-
-## 🔗 相关文献
-
-[待补充]
-
-## 📓 User Data {: custom-literature-block-type="user data"}
-
-> 以下为你的个人笔记，不会被自动刷新覆盖。
-
+### 🤔 思考与疑问
+- 优点 | 局限 | 可借鉴点 | 疑问
 ```
 
 ## 区域说明
 
-| 区域 | 来源 | 更新策略 |
-|------|------|---------|
-| 元数据头部 | Zotero API | 创建时写入，刷新时更新 |
-| Abstract | Zotero 摘要字段 | 创建时写入 |
-| Zotero Notes | Zotero 笔记 | 创建时写入 |
-| 研究问题 | AI 分析全文 | 创建时生成，手动修改 |
-| 方法与实验 | AI 分析全文 + 蓝色标注 | 创建时生成 |
-| 核心发现 | AI 分析全文 + 黄色标注 | 创建时生成 |
-| 关键引文 | 红色标注 + 批注 | 创建时导入，可手动补充 |
-| 思考与疑问 | AI 洞察 + 紫色标注 | 创建时生成 |
-| User Data | 用户手动编辑 | 永远不自动覆盖 |
-
-## 标注颜色映射
-
-| Zotero 颜色 | 归入区域 | 格式 |
-|------------|---------|------|
-| 🟡 黄色 | 核心发现 | `- text [→](zotero://...)` |
-| 🔴 红色 | 关键引文 | `> text\\n> — [定位](zotero://...)` |
-| 🔵 蓝色 | 方法与实验 | `- text [→](zotero://...)` |
-| 🟢 绿色 | 核心发现（支撑） | `- text [→](zotero://...)` |
-| 🟣 紫色 | 思考与疑问 | `- text [→](zotero://...)` |
-| 📝 批注 | 关键引文 | `> **标注**: comment\\n> 原文: text — [定位](zotero://...)` |
-
-## 超链格式
-
-| 用途 | 格式 |
+| 区域 | 要求 |
 |------|------|
-| 打开 PDF | `zotero://open-pdf/library/items/<pdfKey>` |
-| 跳转页码 | `zotero://open-pdf/library/items/<pdfKey>?page=<0-based>` |
-| 跳转标注 | `zotero://open-pdf/library/items/<pdfKey>?page=<n>&annotation=<key>` |
-| 定位条目 | `zotero://select/library/items/<itemKey>` |
-| 思源文档 | `siyuan://blocks/<docId>` |
-| 块引用 | `((docId "text"))` |
-
-## 自定义模板
-
-在 `config.json` 中可指定自定义模板文件：
-
-```json
-{
-  "litNote": {
-    "templateFile": "/path/to/custom-template.md"
-  }
-}
-```
-
-模板变量参考 `zotero-item.js` 和 `zotero-notes.js` 的输出字段。
+| 一句话总结 | 20 字内，核心贡献 |
+| 模型架构 | **最重要**，逐模块详细，每项有页码 |
+| 训练策略 | 可复现的完整超参数 |
+| 核心结果 | 表格化，标注 SOTA 对比 |
+| 关键引文 | 原文引述 + 页码 |
+| 思考与疑问 | 个人分析 |
