@@ -6,16 +6,50 @@ const crypto = require('crypto');
 const ConfigManager = require('./lib/config');
 const { createErrorResult, createSuccessResult } = require('./lib/result-helper');
 
+/** 通过思源 API 上传文件到 data 目录 */
+function siyuanPutFile(siyuanBaseUrl, siyuanToken, filePath, fileBuffer, filename) {
+  return new Promise((resolve) => {
+    const boundary = '----SiYuanBoundary' + Date.now();
+    const header = Buffer.from(
+      '--' + boundary + '\r\n' +
+      'Content-Disposition: form-data; name="path"\r\n\r\n' +
+      filePath + '\r\n' +
+      '--' + boundary + '\r\n' +
+      'Content-Disposition: form-data; name="isDir"\r\n\r\n' +
+      'false\r\n' +
+      '--' + boundary + '\r\n' +
+      'Content-Disposition: form-data; name="modTime"\r\n\r\n' +
+      Math.floor(Date.now() / 1000) + '\r\n' +
+      '--' + boundary + '\r\n' +
+      'Content-Disposition: form-data; name="file"; filename="' + filename + '"\r\n' +
+      'Content-Type: image/jpeg\r\n\r\n'
+    );
+    const footer = Buffer.from('\r\n--' + boundary + '--\r\n');
+    const body = Buffer.concat([header, fileBuffer, footer]);
+
+    const url = new URL('/api/file/putFile', siyuanBaseUrl);
+    const req = require('http').request({
+      method: 'POST', hostname: url.hostname, port: url.port, path: url.pathname,
+      headers: { 'Content-Type': 'multipart/form-data; boundary=' + boundary, 'Authorization': `Token ${siyuanToken}`, 'Content-Length': body.length }
+    }, (res) => {
+      let d = ''; res.on('data', c => d += c);
+      res.on('end', () => { try { const r = JSON.parse(d); resolve(r.code === 0); } catch (_) { resolve(false); } });
+    });
+    req.on('error', () => resolve(false));
+    req.write(body); req.end();
+  });
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const config = new ConfigManager().get();
 
-  let pdfPath = '', itemKey = '', outputDir = '', siyuanAssetsDir = '';
+  let pdfPath = '', itemKey = '', outputDir = '', siyuanAssets = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--pdf' && args[i + 1]) pdfPath = args[++i];
     if (args[i] === '--key' && args[i + 1]) itemKey = args[++i];
     if (args[i] === '--output' && args[i + 1]) outputDir = args[++i];
-    if (args[i] === '--siyuan-assets' && args[i + 1]) siyuanAssetsDir = args[++i];
+    if (args[i] === '--siyuan-assets') siyuanAssets = true;
   }
 
   if (!config.mineru.enabled) {
@@ -107,23 +141,27 @@ async function main() {
       process.exit(1);
     }
 
-    // 复制图片到 SiYuan assets + 路径替换
+    // 通过思源 API 上传图片（直接 cp 不注册到思源索引，图片不显示）
     let imagesCopied = 0;
     let markdownOut = markdown;
-    if (siyuanAssetsDir) {
-      fs.mkdirSync(siyuanAssetsDir, { recursive: true });
+    if (siyuanAssets) {
       const imgDir = path.join(outputDir, 'images');
       const imgRoot = fs.existsSync(imgDir) ? imgDir : outputDir;
       const imgFiles = fs.readdirSync(imgRoot).filter(f => /\.(png|jpg|jpeg|gif|svg|webp)$/i.test(f));
       for (const f of imgFiles) {
-        fs.copyFileSync(path.join(imgRoot, f), path.join(siyuanAssetsDir, f));
-        markdownOut = markdownOut.replace(new RegExp(`images/${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'), `assets/${f}`);
-        imagesCopied++;
+        try {
+          const imgData = fs.readFileSync(path.join(imgRoot, f));
+          const ok = await siyuanPutFile(config.siyuan.baseUrl, config.siyuan.token, `assets/${f}`, imgData, f);
+          if (ok) {
+            markdownOut = markdownOut.replace(new RegExp(`images/${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'), `assets/${f}`);
+            imagesCopied++;
+          }
+        } catch (_) {}
       }
     }
 
     console.log(JSON.stringify(createSuccessResult({
-      markdown: siyuanAssetsDir ? markdownOut : markdown,
+      markdown: siyuanAssets ? markdownOut : markdown,
       pdfPath,
       outputDir,
       contentPages,
