@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const { spawn } = require('child_process');
 const http = require('http');
+const fs = require('fs');
 const ConfigManager = require('./lib/config');
 const { createErrorResult, createSuccessResult } = require('./lib/result-helper');
 
@@ -8,15 +9,6 @@ const { createErrorResult, createSuccessResult } = require('./lib/result-helper'
  *  公式中的反斜杠原样保留（SiYuan kramdown 在 $...$ / $$...$$ 内不处理转义） */
 function escapeContent(text) {
   return text.replace(/\\n/g, '\u0000').replace(/\n/g, '\u0000').replace(/\u0000/g, '\\n');
-}
-
-/** 从文件读取内容（绕过 bash 变量展开问题） */
-function readContentFile(filePath) {
-  try {
-    return require('fs').readFileSync(filePath, 'utf8');
-  } catch (e) {
-    return null;
-  }
 }
 
 async function main() {
@@ -40,9 +32,8 @@ async function main() {
   }
   // --content-file 优先（绕过 bash 变量展开）
   if (contentFile) {
-    const fileContent = readContentFile(contentFile);
-    if (!fileContent) { console.log(JSON.stringify(createErrorResult('文件读取失败', contentFile))); process.exit(1); }
-    content = fileContent;
+    try { content = fs.readFileSync(contentFile, 'utf8'); }
+    catch (e) { console.log(JSON.stringify(createErrorResult('文件读取失败', e.message))); process.exit(1); }
   }
   if (!key || !title) { console.log(JSON.stringify(createErrorResult('参数错误', '需 --key 和 --title'))); process.exit(1); }
   if (!content) { console.log(JSON.stringify(createErrorResult('参数错误', '需 --content 或 --content-file'))); process.exit(1); }

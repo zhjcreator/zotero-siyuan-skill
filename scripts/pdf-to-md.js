@@ -1,20 +1,44 @@
 #!/usr/bin/env node
 const { spawnSync } = require('child_process');
 const fs = require('fs');
+const http = require('http');
 const path = require('path');
 const crypto = require('crypto');
 const ConfigManager = require('./lib/config');
 const { createErrorResult, createSuccessResult } = require('./lib/result-helper');
 
+/** 上传图片到思源（通过 API，fs.copyFile 不会注册到思源索引） */
+function uploadToSiyuan(baseUrl, token, filePath, fileName) {
+  return new Promise((resolve) => {
+    const imgData = fs.readFileSync(filePath);
+    const boundary = '----SiYuan' + Date.now();
+    const header = Buffer.from(
+      `--${boundary}\r\nContent-Disposition: form-data; name="path"\r\n\r\nassets/${fileName}\r\n` +
+      `--${boundary}\r\nContent-Disposition: form-data; name="isDir"\r\n\r\nfalse\r\n` +
+      `--${boundary}\r\nContent-Disposition: form-data; name="modTime"\r\n\r\n${Math.floor(Date.now() / 1000)}\r\n` +
+      `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: application/octet-stream\r\n\r\n`
+    );
+    const body = Buffer.concat([header, imgData, Buffer.from(`\r\n--${boundary}--\r\n`)]);
+    const url = new URL('/api/file/putFile', baseUrl);
+    const req = http.request({
+      method: 'POST', hostname: url.hostname, port: url.port, path: url.pathname,
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}`, 'Authorization': `Token ${token}`, 'Content-Length': body.length }
+    }, (res) => { let d = ''; res.on('data', c => d += c); res.on('end', () => { try { resolve(JSON.parse(d)); } catch (_) { resolve({ code: -1 }); } }); });
+    req.on('error', () => resolve({ code: -1 }));
+    req.write(body); req.end();
+  });
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const config = new ConfigManager().get();
 
-  let pdfPath = '', itemKey = '', outputDir = '';
+  let pdfPath = '', itemKey = '', outputDir = '', siyuanAssets = false;
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--pdf' && args[i + 1]) pdfPath = args[++i];
     if (args[i] === '--key' && args[i + 1]) itemKey = args[++i];
     if (args[i] === '--output' && args[i + 1]) outputDir = args[++i];
+    if (args[i] === '--siyuan-assets') siyuanAssets = true;
   }
 
   if (!config.mineru.enabled) {
@@ -106,12 +130,29 @@ async function main() {
       process.exit(1);
     }
 
+    // 按需上传图片到思源（通过 API，确保思源能识别）
+    let imagesCopied = 0;
+    let markdownOut = markdown;
+    if (siyuanAssets) {
+      const imgDir = path.join(outputDir, 'images');
+      const imgRoot = fs.existsSync(imgDir) ? imgDir : outputDir;
+      const imgFiles = fs.readdirSync(imgRoot).filter(f => /\.(png|jpg|jpeg|gif|svg|webp)$/i.test(f));
+      for (const f of imgFiles) {
+        const res = await uploadToSiyuan(config.siyuan.baseUrl, config.siyuan.token, path.join(imgRoot, f), f);
+        if (res.code === 0) {
+          markdownOut = markdownOut.replace(new RegExp(`images/${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'), `assets/${f}`);
+          imagesCopied++;
+        }
+      }
+    }
+
     console.log(JSON.stringify(createSuccessResult({
-      markdown,
+      markdown: siyuanAssets ? markdownOut : markdown,
       pdfPath,
       outputDir,
       contentPages,
       convertMethod: `mineru-extract`,
+      imagesCopied,
       fileSizeMB: Math.round(fileSizeMB * 100) / 100,
       hasPageMapping: contentPages.length > 0
     })));

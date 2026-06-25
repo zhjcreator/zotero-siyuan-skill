@@ -38,7 +38,8 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 
 | 脚本 | 说明 | 示例 |
 |------|------|------|
-| `pdf-to-md` | PDF→Markdown | `node {baseDir}/scripts/pdf-to-md.js --key <itemKey>` |
+| `pdf-to-md` | PDF→Markdown | `node {baseDir}/scripts/pdf-to-md.js --key <itemKey> --siyuan-assets` |
+| | | `--siyuan-assets` 不传值或传 `auto` 时自动从 SiYuan API 发现 assets 路径；也可手动指定路径 |
 | `zotero-write-annotation` | 创建 PDF 标注 | `node {baseDir}/scripts/zotero-write-annotation.js --pdf-key <key> --page <n> --comment "<html>"` |
 
 ### 文献笔记操作
@@ -46,7 +47,8 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 | 脚本 | 说明 | 示例 |
 |------|------|------|
 | `lit-note-find` | 查找文献笔记 | `node {baseDir}/scripts/lit-note-find.js --key <itemKey>` |
-| `lit-note-create` | 创建文献笔记 | `node {baseDir}/scripts/lit-note-create.js --key <itemKey> --title "标题" --content "<md>" --entry-data "<json>"` |
+| `lit-note-create` | 创建文献笔记 | `node {baseDir}/scripts/lit-note-create.js --key <itemKey> --title "标题" --content "<md>" --content-file <path> --entry-data "<json>"` |
+| | | `--content-file` 从文件读取内容，彻底避免 bash 转义问题，推荐在公式密集时使用 |
 | `lit-note-append` | 追加内容 | `node {baseDir}/scripts/lit-note-append.js --doc-id <id> --section "User Data" --content "<md>"` |
 
 ### AI 辅助
@@ -79,6 +81,7 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
     └─ pdf-to-md.js --key <itemKey>
        j.data.markdown 含完整 Markdown（图片路径为 images/xxx.jpg）
        j.data.contentPages 提供内容→页码映射
+       可选 --siyuan-assets auto：自动发现并复制图片到 SiYuan assets（一步到位）
 
 [4] AI 分析 + 选图
     生成笔记时，从 Markdown 中选择关键图（架构图、实验结果），
@@ -86,8 +89,8 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 
 [4.5] 按需上传图片
     └─ siyuan-upload-images.js --dir <mineru-output> --file "img1,img2"
-       只上传笔记中引用的图片到 ~/SiYuan/assets/
-       笔记中引用路径为 assets/xxx.jpg
+       通过 SiYuan API 上传，自动存入正确的 assets 目录
+       只上传笔记中引用的图片，笔记中引用路径为 assets/xxx.jpg
      │
      ▼
 [4] AI 分析生成笔记内容
