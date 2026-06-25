@@ -2,11 +2,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 function escapeContent(text) {
-  return text
-    .replace(/\\n/g, '\u0000')
-    .replace(/\n/g, '\u0000')
-    .replace(/(?<!\\)\\(?!\\)/g, '\\\\')
-    .replace(/\u0000/g, '\\n');
+  return text.replace(/\\n/g, '\u0000').replace(/\n/g, '\u0000').replace(/\u0000/g, '\\n');
 }
 
 class SiyuanBridge {

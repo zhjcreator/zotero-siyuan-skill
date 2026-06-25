@@ -4,13 +4,10 @@ const http = require('http');
 const ConfigManager = require('./lib/config');
 const { createErrorResult, createSuccessResult } = require('./lib/result-helper');
 
-/** 标准化内容：单反斜杠→双反斜杠（防 kramdown 吃掉），换行→siyuan 格式 */
+/** 标准化内容：仅处理换行 → siyuan 格式 \\n。
+ *  公式中的反斜杠原样保留（SiYuan kramdown 在 $...$ / $$...$$ 内不处理转义） */
 function escapeContent(text) {
-  return text
-    .replace(/\\n/g, '\u0000')
-    .replace(/\n/g, '\u0000')
-    .replace(/(?<!\\)\\(?!\\)/g, '\\\\')
-    .replace(/\u0000/g, '\\n');
+  return text.replace(/\\n/g, '\u0000').replace(/\n/g, '\u0000').replace(/\u0000/g, '\\n');
 }
 
 async function main() {
