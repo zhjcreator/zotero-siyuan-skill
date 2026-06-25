@@ -75,11 +75,11 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
     └─ zotero-attachment.js --key <key>   → PDF 本地路径
      │
      ▼
-[3] PDF 全文分析（一次获取全文，不分段）
-    └─ pdf-to-md.js --key <itemKey>
-       JSON 输出 j.data.markdown 包含完整论文 Markdown（200KB+），
-       直接从脚本输出读取，不要再用 Read 工具分段读文件
+[3] PDF 全文分析 + 图片提取
+    └─ pdf-to-md.js --key <itemKey> --siyuan-assets <思源data/assets路径>
+       JSON 输出 j.data.markdown 含完整论文 Markdown（含图片引用路径已替换为 assets/）
        j.data.contentPages 提供内容→页码映射
+       图片自动复制到思源 assets 目录，笔记中直接用 assets/xxx.png 引用
      │
      ▼
 [4] AI 分析生成笔记内容
@@ -228,7 +228,8 @@ $$
 - 疑问：[...]
 ```
 
-> **模板要点**：模型架构是核心，必须详细到模块级（backbone/neck/head/损失函数），每项标注页码超链。结果/训练用表格。公式正常写 KaTeX 即可（`\sum`, `\alpha`, `\mathcal{L}` 等无需双写反斜杠，SiYuan `$$` 内原样传给 KaTeX）。块级公式 `$$...$$` 前后必须有空行。
+> **模板要点**：模型架构是核心，必须详细到模块级（backbone/neck/head/损失函数），每项标注页码超链。结果/训练用表格。公式正常写 KaTeX 即可。块级公式前后必须有空行。
+> **图片**：从 MinerU 输出的 Markdown 中提取关键图（架构图、实验结果图），用 `![描述](assets/xxx.png)` 嵌入笔记对应区域。`pdf-to-md.js --siyuan-assets` 已自动复制图片并替换路径。
 
 ---
 
