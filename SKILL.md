@@ -179,50 +179,37 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 ## AI 管理的区域（放在 User Data 内，不会被插件刷新覆盖）
 
 ```markdown
-## User Data {: custom-literature-block-type="user data"}
+## User Data
+{: custom-literature-block-type="user data"}
 
 > 以下内容由 AI 生成，不会被插件刷新覆盖。
 
 ### 🔬 研究问题
-[AI 基于全文分析总结的研究问题]
+[2-3 句话总结]
 
 ### ⚙️ 方法与实验
-[AI 基于全文分析的方法总结]（蓝色标注归入此处，附 PDF 链接）
-公式支持：$E = mc^2$（行内）和单独段落的公式块
+[不少于 200 字：架构、训练策略、数据集、评估指标、超参数]
+每项附 [第N页](zotero://...)
 
 ### 💡 核心发现
-[AI 基于全文分析和黄色标注的核心发现]
-每个发现附最高精度 PDF 超链
+[每项 1-2 句 + [第N页](zotero://...) 链接]
 
 ### 📖 关键引文
-[红色标注原文 + 批注 + PDF 标注链接]
-> 原文引用
+> "原文引用"
+> — 论文简称, 期刊/年份, [第N页](zotero://...)
 
 ### 🤔 思考与疑问
-[AI 分析洞察 + 紫色标注]
-
-### 🔗 相关文献
-[待补充]
+[AI 洞察]
 ```
-
-## 创建/更新笔记的流程（插件优先）
-
-1. **检查插件是否已有文献笔记**：`lit-note-find.js --key <itemKey>` 查 `custom-literature-key`
-2. **若已存在**（插件已创建）→ 检查是否有 User Data 区域 → 将 AI 内容追加到 User Data
-3. **若不存在** → 创建最小文档（仅含 User Data + AI 内容），设置 `custom-literature-key`，用户后续在思源中插入引用时插件会自动补充上方模板
-4. 插件刷新模板区域不会覆盖 User Data，AI 内容安全
 
 ## 超链注入规则
 
-1. **PDF 入口**：笔记中关键发现附带 PDF 超链 `zotero://open-pdf/library/items/<pdfKey>?page=<n>`
-2. **标注优先**：L4 标注级（`&annotation=KEY`）> L3 页码级（`?page=N`）> L2 文件级
-3. **公式格式**：行内 `$...$`（如 `$E=mc^2$`），块级 `$$...$$`（如 `$$\sum_{i=1}^n x_i$$`），注意在传给思源时需转义为 `\\$...\\$` 和 `\\$\\$...\\$\\$`
-4. **内容到 PDF 位置的超链**：使用 `pdf-to-md.js` extract 模式输出的 `contentPages` 字段，可将 Markdown 中的关键段落精确映射到 PDF 页码，生成 `zotero://open-pdf/library/items/<pdfKey>?page=<n>` 超链。flash-extract 模式不提供此映射
-5. **图片清晰度**：使用 `--mode extract`（需 mineru token）可获得高分辨率图片和 `contentPages` 页码映射
-
-[AI 基于全文分析的方法总结]
-
-## 💡 核心发现
+1. **PDF 超链用简短锚文本**：`[第3页](zotero://...)`，不要裸写 URL
+2. **标注优先**：L4 标注级 > L3 页码级 > L2 文件级
+3. **公式用标准 KaTeX**：行内 `$E=mc^2$`，块级 `$$...$$`。传给 lit-note-create 时不需要额外转义 `$`
+4. **内容→页码映射**：`pdf-to-md.js` extract 模式输出 `contentPages`，精确映射到 PDF 页
+5. **图片**：`pdf-to-md.js --siyuan-assets <dir>` 自动复制图片到思源 assets，路径 `assets/xxx.png`
+6. **引文列论文信息**：作者 + 论文名 + 期刊/年份 + PDF 链接，不裸写 zotero:// URL
 
 [AI 基于全文分析和黄色标注的核心发现]
 

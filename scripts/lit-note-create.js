@@ -88,7 +88,7 @@ async function main() {
         // 无 User Data 区域，创建新的
         const insertRes = await siyuanAPI('POST', '/api/block/insertBlock', {
           dataType: 'markdown',
-          data: escapeNL('## User Data {: custom-literature-block-type="user data"}\n\n' + content),
+          data: escapeNL('## User Data\n{: custom-literature-block-type="user data"}\n\n' + content),
           parentID: docId
         });
         console.log(JSON.stringify(createSuccessResult({ id: docId, title, existed: true, updated: true, createdUserData: true }, '已创建 User Data 并写入')));
@@ -112,7 +112,7 @@ async function main() {
   const safeTitle = title.replace(/[/\\:*?"<>|]/g, '_');
   const docPath = `/${notebookName}/${litPath}/${safeTitle}`;
 
-  const docContent = escapeNL(content + '\n\n## User Data {: custom-literature-block-type="user data"}\n\n> 以下内容由 AI 生成，不会被插件刷新覆盖。');
+  const docContent = escapeNL(content + '\n\n## User Data\n{: custom-literature-block-type="user data"}\n\n> 以下内容由 AI 生成，不会被插件刷新覆盖。');
   const createOut = await spawnOut('node', [skillDir + '/scripts/create.js', safeTitle, '--path', docPath, '--content', docContent], { timeout: 30000 });
   let createRes;
   try { createRes = JSON.parse(createOut.trim()); } catch (e) { throw new Error('解析创建结果失败'); }
