@@ -120,6 +120,11 @@ async function main() {
   const docId = createRes.data?.id || '';
   if (!docId) { console.log(JSON.stringify(createErrorResult('创建失败', '未获取文档 ID'))); process.exit(1); }
 
+  // 如果标题被 sanitize 了，重命名为原始标题
+  if (safeTitle !== title) {
+    await spawnOut('node', [skillDir + '/scripts/rename.js', docId, title]);
+  }
+
   await siyuanAPI('POST', '/api/attr/setBlockAttrs', {
     id: docId,
     attrs: Object.assign(
