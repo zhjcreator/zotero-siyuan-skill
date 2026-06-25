@@ -107,8 +107,9 @@ async function main() {
       process.exit(1);
     }
 
-    // 复制图片到 SiYuan assets
+    // 复制图片到 SiYuan assets + 路径替换
     let imagesCopied = 0;
+    let markdownOut = markdown;
     if (siyuanAssetsDir) {
       fs.mkdirSync(siyuanAssetsDir, { recursive: true });
       const imgDir = path.join(outputDir, 'images');
@@ -116,12 +117,13 @@ async function main() {
       const imgFiles = fs.readdirSync(imgRoot).filter(f => /\.(png|jpg|jpeg|gif|svg|webp)$/i.test(f));
       for (const f of imgFiles) {
         fs.copyFileSync(path.join(imgRoot, f), path.join(siyuanAssetsDir, f));
+        markdownOut = markdownOut.replace(new RegExp(`images/${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'), `assets/${f}`);
         imagesCopied++;
       }
     }
 
     console.log(JSON.stringify(createSuccessResult({
-      markdown,
+      markdown: siyuanAssetsDir ? markdownOut : markdown,
       pdfPath,
       outputDir,
       contentPages,

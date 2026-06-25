@@ -4,15 +4,22 @@ const http = require('http');
 const ConfigManager = require('./lib/config');
 const { createErrorResult, createSuccessResult } = require('./lib/result-helper');
 
+/**
+ * 创建或更新思源文献笔记。
+ * 优先兼容 siyuan-plugin-citation：AI 内容写入 User Data 区域，
+ * 插件可以安全刷新上方的模板部分而不会覆盖 AI 内容。
+ */
+
+/** 标准化换行：字面量 \n → 实际换行 → siyuan-skill 格式 \\n */
+function escapeNL(text) {
+  return text.replace(/\\n/g, '\n').replace(/\n/g, '\\n');
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const config = new ConfigManager().get();
   const skillDir = config.siyuan.skillDir;
-
-  if (!skillDir) {
-    console.log(JSON.stringify(createErrorResult('配置错误', 'siyuan-skill 未找到')));
-    process.exit(1);
-  }
+  if (!skillDir) { console.log(JSON.stringify(createErrorResult('配置错误', 'siyuan-skill 未找到'))); process.exit(1); }
 
   let key = '', libId = config.zotero.libraryID, title = '', content = '', entryData = '',
       force = false, pdfKey = '', notebookName = config.litNote.notebookName;
@@ -27,161 +34,101 @@ async function main() {
     if (args[i] === '--notebook' && args[i + 1]) notebookName = args[++i];
     if (args[i] === '--force') force = true;
   }
-
-  if (!key || !title) {
-    console.log(JSON.stringify(createErrorResult('参数错误', '请提供 --key <itemKey> 和 --title <title>')));
-    process.exit(1);
-  }
+  if (!key || !title) { console.log(JSON.stringify(createErrorResult('参数错误', '请提供 --key <itemKey> 和 --title <title>'))); process.exit(1); }
 
   const literatureKey = `${libId}_${key}`;
   const siyuanUrl = new URL(config.siyuan.baseUrl);
   const token = config.siyuan.token || '';
+  const spawnEnv = { ...process.env, SIYUAN_BASE_URL: config.siyuan.baseUrl, SIYUAN_TOKEN: token };
 
-  /** 通过 HTTP 直接调用思源 API，避免 siyuan-skill block-attrs.js 的 JSON 截断问题 */
   function siyuanAPI(method, path, body) {
     return new Promise((resolve, reject) => {
-      const req = http.request({
-        method, hostname: siyuanUrl.hostname, port: siyuanUrl.port, path,
+      const req = http.request({ method, hostname: siyuanUrl.hostname, port: siyuanUrl.port, path,
         headers: { 'Content-Type': 'application/json', 'Authorization': `Token ${token}` }
-      }, (res) => {
-        let d = ''; res.on('data', c => d += c); res.on('end', () => {
-          try { resolve(JSON.parse(d)); } catch (_) { resolve({ code: -1, msg: d }); }
-        });
-      });
+      }, (res) => { let d = ''; res.on('data', c => d += c); res.on('end', () => { try { resolve(JSON.parse(d)); } catch (_) { resolve({ code: -1 }); } }); });
       req.on('error', reject);
       if (body) req.write(JSON.stringify(body));
       req.end();
     });
   }
 
-  // 检查是否已存在
-  const findProc = spawn('node', [__dirname + '/lit-note-find.js', '--key', key], {
-    encoding: 'utf8', timeout: 10000,
-    env: { ...process.env, SIYUAN_BASE_URL: config.siyuan.baseUrl, SIYUAN_TOKEN: token }
-  });
-  const findOut = await new Promise((resolve) => {
-    let d = ''; findProc.stdout.on('data', c => d += c);
-    findProc.on('close', () => resolve(d));
-    findProc.on('error', () => resolve(''));
-  });
-  let existingDocId = null;
+  function spawnOut(cmd, args, opts) {
+    return new Promise((resolve) => {
+      const p = spawn(cmd, args, { encoding: 'utf8', timeout: opts?.timeout || 10000, env: opts?.env || spawnEnv });
+      let d = ''; p.stdout.on('data', c => d += c);
+      p.on('close', () => resolve(d)); p.on('error', () => resolve(''));
+    });
+  }
+
+  // 1. 查找已有笔记
   try {
-    const findRes = JSON.parse(findOut.trim());
-    if (findRes.success && findRes.data && findRes.data.id) existingDocId = findRes.data.id;
+    const fOut = await spawnOut('node', [__dirname + '/lit-note-find.js', '--key', key]);
+    const findRes = JSON.parse(fOut.trim());
+    if (findRes.success && findRes.data?.id) {
+      const docId = findRes.data.id;
+
+      // 2. 笔记已存在 → 检查是否有 User Data 区域，追加 AI 内容
+      let userDataBlockId = null;
+      try {
+        const sqlRes = await siyuanAPI('POST', '/api/query/sql', {
+          stmt: `SELECT a.block_id FROM attributes a WHERE name = 'custom-literature-block-type' AND value = 'user data' AND a.block_id IN (SELECT b.id FROM blocks b WHERE b.root_id = '${docId}')`
+        });
+        if (sqlRes.code === 0 && sqlRes.data?.length) userDataBlockId = sqlRes.data[0].block_id;
+      } catch (_) {}
+
+      const userDataContent = '\n\n' + content;
+      if (userDataBlockId) {
+        // 更新 User Data 块
+        const getBlockRes = await siyuanAPI('POST', '/api/block/getBlockInfo', { id: userDataBlockId });
+        const oldContent = (getBlockRes.data?.content || '').replace(/\n/g, '\\n');
+        const newMarkdown = oldContent + escapeNL(userDataContent);
+        await siyuanAPI('POST', '/api/block/updateBlock', { id: userDataBlockId, dataType: 'markdown', data: newMarkdown });
+        console.log(JSON.stringify(createSuccessResult({ id: docId, title, existed: true, updated: true, appendedToUserData: true }, '已追加到 User Data')));
+      } else {
+        // 无 User Data 区域，创建新的
+        const insertRes = await siyuanAPI('POST', '/api/block/insertBlock', {
+          dataType: 'markdown',
+          data: escapeNL('## User Data {: custom-literature-block-type="user data"}\n\n' + content),
+          parentID: docId
+        });
+        console.log(JSON.stringify(createSuccessResult({ id: docId, title, existed: true, updated: true, createdUserData: true }, '已创建 User Data 并写入')));
+      }
+      return;
+    }
   } catch (_) {}
 
-  // --force 模式: 更新已有文档的内容和属性
-  if (force && existingDocId) {
-    const userDataBlock = '\n\n## User Data {: custom-literature-block-type="user data"}\n\n> 以下为你的个人笔记，不会被自动刷新覆盖。';
-
-    const escaped = (content + userDataBlock).replace(/\\n/g, '\\\\n').replace(/\n/g, '\\n');
-    const updateProc = spawn('node', [skillDir + '/scripts/update.js', existingDocId, '--content', escaped], {
-      timeout: 30000,
-      env: { ...process.env, SIYUAN_BASE_URL: config.siyuan.baseUrl, SIYUAN_TOKEN: token }
-    });
-    const updateOut = await new Promise((resolve) => {
-      let d = ''; updateProc.stdout.on('data', c => d += c);
-      updateProc.on('close', () => resolve(d));
-      updateProc.on('error', () => resolve(''));
-    });
-
-    // 直接用 HTTP API 设置属性（避免 JSON 截断）
-    const attrs = {
-      'custom-literature-key': literatureKey,
-      'custom-entry-data': entryData || '{}',
-      'custom-zotero-item-key': key,
-      'custom-paper-note': 'true'
-    };
-    if (pdfKey) attrs['custom-zotero-pdf-key'] = pdfKey;
-    await siyuanAPI('POST', '/api/attr/setBlockAttrs', { id: existingDocId, attrs });
-
-    console.log(JSON.stringify(createSuccessResult({
-      id: existingDocId, title, literatureKey, pdfKey: pdfKey || '',
-      siyuanURI: `siyuan://blocks/${existingDocId}`, existed: true, updated: true
-    }, '文献笔记已更新（覆盖模式）')));
-    return;
-  }
-
-  // 非 force、已存在
-  if (existingDocId && !force) {
-    console.log(JSON.stringify(createSuccessResult({
-      id: existingDocId, title, existed: true, updated: false
-    }, '文献笔记已存在，返回已有 ID（使用 --force 覆盖）')));
-    return;
-  }
-
-  // 新建文档
-  const userDataBlock = '\n\n## User Data {: custom-literature-block-type="user data"}\n\n> 以下为你的个人笔记，不会被自动刷新覆盖。';
-
-  const fullContent = content + userDataBlock;
-  // 获取笔记本名称
+  // 3. 笔记不存在 → 创建新文档（仅含 minimal 模板 + User Data，让插件后续补充模板）
   if (!notebookName) {
     try {
-      const nbProc = spawn('node', [skillDir + '/scripts/notebooks.js'], {
-        encoding: 'utf8', timeout: 10000,
-        env: { ...process.env, SIYUAN_BASE_URL: config.siyuan.baseUrl, SIYUAN_TOKEN: token }
-      });
-      const nbOut = await new Promise((resolve) => {
-        let d = ''; nbProc.stdout.on('data', c => d += c);
-        nbProc.on('close', () => resolve(d));
-        nbProc.on('error', () => resolve(''));
-      });
+      const nbOut = await spawnOut('node', [skillDir + '/scripts/notebooks.js']);
       const nb = JSON.parse(nbOut.trim());
-      const notebooks = nb.notebooks || (nb.data && nb.data.notebooks) || [];
+      const notebooks = nb.notebooks || (nb.data?.notebooks) || [];
       if (notebooks.length) notebookName = notebooks[0].name;
     } catch (_) {}
   }
-  if (!notebookName) {
-    console.log(JSON.stringify(createErrorResult('配置错误', '无法获取笔记本名称')));
-    process.exit(1);
-  }
+  if (!notebookName) { console.log(JSON.stringify(createErrorResult('配置错误', '无法获取笔记本名称'))); process.exit(1); }
 
   const litPath = config.litNote.path.replace(/^\/+/, '');
   const safeTitle = title.replace(/[/\\:*?"<>|]/g, '_');
   const docPath = `/${notebookName}/${litPath}/${safeTitle}`;
-  const escaped = fullContent.replace(/\\n/g, '\\\\n').replace(/\n/g, '\\n');
 
-  const createProc = spawn('node', [skillDir + '/scripts/create.js', safeTitle, '--path', docPath, '--content', escaped], {
-    timeout: 30000,
-    env: { ...process.env, SIYUAN_BASE_URL: config.siyuan.baseUrl, SIYUAN_TOKEN: token }
-  });
-  const createOut = await new Promise((resolve, reject) => {
-    let stdout = '', stderr = '';
-    createProc.stdout.on('data', c => stdout += c);
-    createProc.stderr.on('data', c => stderr += c);
-    createProc.on('close', (code) => code === 0 ? resolve(stdout) : reject(new Error(stderr || stdout || `exit ${code}`)));
-    createProc.on('error', reject);
-  });
-
+  const docContent = escapeNL(content + '\n\n## User Data {: custom-literature-block-type="user data"}\n\n> 以下内容由 AI 生成，不会被插件刷新覆盖。');
+  const createOut = await spawnOut('node', [skillDir + '/scripts/create.js', safeTitle, '--path', docPath, '--content', docContent], { timeout: 30000 });
   let createRes;
-  try { createRes = JSON.parse(createOut.trim()); } catch (e) { throw new Error('解析创建结果失败: ' + createOut.substring(0, 200)); }
-  if (!createRes || !createRes.success) {
-    console.log(JSON.stringify(createErrorResult('创建失败', createRes?.message || createRes?.error || '未知错误')));
-    process.exit(1);
-  }
-  const docId = createRes.data?.id || createRes.data?.docId || '';
-  if (!docId) {
-    console.log(JSON.stringify(createErrorResult('创建失败', '未能获取文档 ID')));
-    process.exit(1);
-  }
+  try { createRes = JSON.parse(createOut.trim()); } catch (e) { throw new Error('解析创建结果失败'); }
+  if (!createRes?.success) { console.log(JSON.stringify(createErrorResult('创建失败', createRes?.message || '未知错误'))); process.exit(1); }
+  const docId = createRes.data?.id || '';
+  if (!docId) { console.log(JSON.stringify(createErrorResult('创建失败', '未获取文档 ID'))); process.exit(1); }
 
-  // 直接用 HTTP API 设置属性
-  const attrs = {
-    'custom-literature-key': literatureKey,
-    'custom-entry-data': entryData || '{}',
-    'custom-zotero-item-key': key,
-    'custom-paper-note': 'true'
-  };
-  if (pdfKey) attrs['custom-zotero-pdf-key'] = pdfKey;
-  await siyuanAPI('POST', '/api/attr/setBlockAttrs', { id: docId, attrs });
+  await siyuanAPI('POST', '/api/attr/setBlockAttrs', {
+    id: docId,
+    attrs: Object.assign(
+      { 'custom-literature-key': literatureKey, 'custom-entry-data': entryData || '{}', 'custom-zotero-item-key': key, 'custom-paper-note': 'true' },
+      pdfKey ? { 'custom-zotero-pdf-key': pdfKey } : {}
+    )
+  });
 
-  console.log(JSON.stringify(createSuccessResult({
-    id: docId, title, literatureKey, path: docPath, pdfKey: pdfKey || '',
-    siyuanURI: `siyuan://blocks/${docId}`, existed: false
-  }, '文献笔记创建成功')));
+  console.log(JSON.stringify(createSuccessResult({ id: docId, title, literatureKey, path: docPath, pdfKey: pdfKey || '', siyuanURI: `siyuan://blocks/${docId}` }, '文献笔记创建成功')));
 }
 
-main().catch(e => {
-  console.log(JSON.stringify(createErrorResult('创建失败', e.message)));
-  process.exit(1);
-});
+main().catch(e => { console.log(JSON.stringify(createErrorResult('创建失败', e.message))); process.exit(1); });

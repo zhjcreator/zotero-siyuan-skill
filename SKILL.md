@@ -205,12 +205,12 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 [待补充]
 ```
 
-## 创建新笔记的流程（重要）
+## 创建/更新笔记的流程（插件优先）
 
 1. **检查插件是否已有文献笔记**：`lit-note-find.js --key <itemKey>` 查 `custom-literature-key`
-2. **若已存在**：通过 `lit-note-append.js` 将 AI 内容写入 User Data 区域
-3. **若不存在**：创建一个最小文档（仅含 User Data 区域 + AI 内容），设置 `custom-literature-key` 属性，用户后续插入引用时插件会补充模板内容
-4. **永远不要**创建新的完整文档覆盖插件已管理的笔记
+2. **若已存在**（插件已创建）→ 检查是否有 User Data 区域 → 将 AI 内容追加到 User Data
+3. **若不存在** → 创建最小文档（仅含 User Data + AI 内容），设置 `custom-literature-key`，用户后续在思源中插入引用时插件会自动补充上方模板
+4. 插件刷新模板区域不会覆盖 User Data，AI 内容安全
 
 ## 超链注入规则
 
