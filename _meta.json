@@ -21,6 +21,7 @@
     "scripts/zotero-attachment.js",
     "scripts/pdf-to-md.js",
     "scripts/zotero-write-annotation.js",
+    "scripts/siyuan-upload-images.js",
     "scripts/lit-note-create.js",
     "scripts/lit-note-append.js",
     "scripts/lit-note-find.js",

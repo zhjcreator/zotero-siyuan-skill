@@ -75,10 +75,19 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
     └─ zotero-attachment.js --key <key>   → PDF 本地路径
      │
      ▼
-[3] PDF 全文分析 + 图片提取
-    └─ pdf-to-md.js --key <itemKey> --siyuan-assets
-       图片通过 SiYuan API 自动上传到 ~/SiYuan/assets/
-       j.data.markdown 中图片路径已替换为 assets/xxx.jpg
+[3] PDF 全文分析
+    └─ pdf-to-md.js --key <itemKey>
+       j.data.markdown 含完整 Markdown（图片路径为 images/xxx.jpg）
+       j.data.contentPages 提供内容→页码映射
+
+[4] AI 分析 + 选图
+    生成笔记时，从 Markdown 中选择关键图（架构图、实验结果），
+    记录其文件名（如 images/015da6...jpg → 015da6...jpg）
+
+[4.5] 按需上传图片
+    └─ siyuan-upload-images.js --dir <mineru-output> --file "img1,img2"
+       只上传笔记中引用的图片到 ~/SiYuan/assets/
+       笔记中引用路径为 assets/xxx.jpg
      │
      ▼
 [4] AI 分析生成笔记内容
@@ -231,7 +240,7 @@ $$
 ```
 
 > **模板要点**：模型架构是核心，必须详细到模块级（backbone/neck/head/损失函数），每项标注页码超链。结果/训练用表格。公式正常写 KaTeX 即可。块级公式前后必须有空行。
-> **图片**：从 MinerU 输出的 Markdown 中提取关键图（架构图、实验结果图），用 `![描述](assets/xxx.png)` 嵌入笔记对应区域。`pdf-to-md.js --siyuan-assets` 已自动复制图片并替换路径。如复制后图片不显示，需重启思源使其重新索引 assets 目录。
+> **图片**：从 MinerU Markdown 中选关键图 → 用 `siyuan-upload-images.js --dir <out> --file "img1,img2"` 按需上传 → 笔记中 `![描述](assets/xxx.jpg)` 引用。
 
 ---
 
