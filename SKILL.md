@@ -75,9 +75,11 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
     └─ zotero-attachment.js --key <key>   → PDF 本地路径
      │
      ▼
-[3] PDF 转 Markdown
-    └─ pdf-to-md.js --key <itemKey>           → full.md + content_list.json + images
-       输出含 contentPages（内容→页码映射）供 AI 生成精确超链
+[3] PDF 全文分析（一次获取全文，不分段）
+    └─ pdf-to-md.js --key <itemKey>
+       JSON 输出 j.data.markdown 包含完整论文 Markdown（200KB+），
+       直接从脚本输出读取，不要再用 Read 工具分段读文件
+       j.data.contentPages 提供内容→页码映射
      │
      ▼
 [4] AI 分析生成笔记内容
