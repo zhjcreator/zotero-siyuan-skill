@@ -2,7 +2,7 @@
 name: "zotero-siyuan-skill"
 description: "Zotero 论文阅读辅助：自动在思源中生成文献笔记，支持 PDF 全文分析、四层超链定位、反向标注。当用户阅读 Zotero 中论文时调用。"
 skillType: "cli"
-homepage: "https://github.com/WingDr/siyuan-plugin-citation"
+homepage: "https://github.com/zhjcreator/zotero-siyuan-skill"
 metadata: {"openclaw":{"emoji":"📚","requires":{"bins":["node","mineru-open-api"],"dependencies":["siyuan-skill"]}}}
 ---
 
