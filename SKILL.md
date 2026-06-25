@@ -203,7 +203,10 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 **整体框架**：[pipeline/end-to-end/two-stage 等，结构图用文字描述]
 **核心组件**（每个附 [第N页](zotero://...) 链接）：
 
-- **Backbone**：[ViT-B/16, ResNet-50, CLIP 等]，输入尺寸/通道
+- **Backbone**：[ViT-B/16, CLIP 等]，输入尺寸/通道 [第N页](zotero://...)
+- **架构图**：
+**Figure 2: Model Architecture** [第N页](zotero://...)
+![整体架构图](assets/xxx.jpg)
 - **特征提取**：[关键模块1]：[作用 + 输入输出维度] [第N页]
 - **核心创新模块**：[注意力机制/Adapter/LoRA 等]：[详细设计，不少于 80 字] [第N页]
 - **Head/解码器**：[分类头/检测头/生成头]：[输出维度，激活函数]
@@ -243,7 +246,11 @@ $$
 ```
 
 > **模板要点**：模型架构是核心，必须详细到模块级（backbone/neck/head/损失函数），每项标注页码超链。结果/训练用表格。公式正常写 KaTeX 即可。块级公式前后必须有空行。
-> **图片**：从 MinerU Markdown 中选关键图 → 用 `siyuan-upload-images.js --dir <out> --file "img1,img2"` 按需上传 → 笔记中 `![描述](assets/xxx.jpg)` 引用。
+> **图片**：从 MinerU Markdown 中选关键图 → 用 `siyuan-upload-images.js --dir <out> --file "img1,img2"` 按需上传 → 笔记中引用格式：
+> ```
+> **Figure N: 标题** [第N页](zotero://open-pdf/...)
+> ![描述](assets/xxx.jpg)
+> ```
 
 ---
 
