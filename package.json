@@ -1,0 +1,26 @@
+{
+  "name": "zotero-siyuan-skill",
+  "version": "1.0.0",
+  "description": "AI-driven skill for Zotero paper reading with SiYuan note integration",
+  "main": "scripts/zotero-status.js",
+  "dependencies": {},
+  "devDependencies": {},
+  "engines": { "node": ">=14.0.0" },
+  "skill": {
+    "requiredEnvVars": [],
+    "optionalEnvVars": [
+      "SIYUAN_BASE_URL",
+      "SIYUAN_TOKEN",
+      "SIYUAN_DEFAULT_NOTEBOOK",
+      "SIYUAN_SKILL_DIR",
+      "ZOTERO_BASE_URL",
+      "ZOTERO_LIBRARY_ID",
+      "LIT_NOTE_PATH",
+      "LIT_NOTE_TEMPLATE",
+      "MINERU_ENABLED",
+      "ZOTERO_PDF_PAGE_OFFSET",
+      "ZOTERO_SIYUAN_CACHE_DIR"
+    ]
+  },
+  "license": "MIT"
+}

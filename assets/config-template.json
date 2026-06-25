@@ -1,0 +1,26 @@
+{
+  "zotero": {
+    "baseUrl": "http://localhost:23119",
+    "apiKey": "",
+    "libraryID": 1
+  },
+  "siyuan": {
+    "baseUrl": "http://localhost:6806",
+    "token": "",
+    "defaultNotebook": "",
+    "skillDir": ""
+  },
+  "litNote": {
+    "path": "/References",
+    "template": "zh",
+    "autoAppendUserData": true
+  },
+  "mineru": {
+    "enabled": true,
+    "command": "mineru-open-api"
+  },
+  "cache": {
+    "dir": ".cache/zotero-siyuan",
+    "refreshOnAnnotationChange": true
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "version": "1.0.0",
+  "name": "zotero-siyuan-skill",
+  "description": "Zotero 论文阅读辅助 skill，AI 驱动生成 SiYuan 文献笔记，支持 PDF 全文分析、四层超链定位、反向标注",
+  "skillType": "cli",
+  "runtime": "node",
+  "runtimeVersion": ">=14.0.0",
+  "entryPoint": "scripts/zotero-status.js",
+  "commands": 11,
+  "directories": {
+    "scripts": "scripts/",
+    "references": "references/",
+    "examples": "examples/",
+    "assets": "assets/"
+  },
+  "scripts": [
+    "scripts/zotero-status.js",
+    "scripts/zotero-item.js",
+    "scripts/zotero-items.js",
+    "scripts/zotero-notes.js",
+    "scripts/zotero-attachment.js",
+    "scripts/pdf-to-md.js",
+    "scripts/zotero-write-annotation.js",
+    "scripts/lit-note-create.js",
+    "scripts/lit-note-append.js",
+    "scripts/lit-note-find.js",
+    "scripts/ask-supplement.js"
+  ]
+}
