@@ -5,7 +5,7 @@ function escapeContent(text) {
   return text
     .replace(/\\n/g, '\u0000')
     .replace(/\n/g, '\u0000')
-    .replace(/\\/g, '\\\\')
+    .replace(/(?<!\\)\\(?!\\)/g, '\\\\')
     .replace(/\u0000/g, '\\n');
 }
 

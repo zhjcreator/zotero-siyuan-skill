@@ -4,11 +4,12 @@ const http = require('http');
 const ConfigManager = require('./lib/config');
 const { createErrorResult, createSuccessResult } = require('./lib/result-helper');
 
+/** 标准化内容：单反斜杠→双反斜杠（防 kramdown 吃掉），换行→siyuan 格式 */
 function escapeContent(text) {
   return text
     .replace(/\\n/g, '\u0000')
     .replace(/\n/g, '\u0000')
-    .replace(/\\/g, '\\\\')
+    .replace(/(?<!\\)\\(?!\\)/g, '\\\\')
     .replace(/\u0000/g, '\\n');
 }
 
