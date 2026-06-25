@@ -10,6 +10,15 @@ function escapeContent(text) {
   return text.replace(/\\n/g, '\u0000').replace(/\n/g, '\u0000').replace(/\u0000/g, '\\n');
 }
 
+/** 从文件读取内容（绕过 bash 变量展开问题） */
+function readContentFile(filePath) {
+  try {
+    return require('fs').readFileSync(filePath, 'utf8');
+  } catch (e) {
+    return null;
+  }
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const config = new ConfigManager().get();
@@ -17,18 +26,26 @@ async function main() {
   if (!skillDir) { console.log(JSON.stringify(createErrorResult('配置错误', 'siyuan-skill 未找到'))); process.exit(1); }
 
   let key = '', libId = config.zotero.libraryID, title = '', content = '', entryData = '',
-      force = false, pdfKey = '', notebookName = config.litNote.notebookName;
+      force = false, pdfKey = '', notebookName = config.litNote.notebookName, contentFile = '';
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--key' && args[i + 1]) key = args[++i];
     if (args[i] === '--library-id' && args[i + 1]) libId = parseInt(args[++i], 10);
     if (args[i] === '--title' && args[i + 1]) title = args[++i];
     if (args[i] === '--content' && args[i + 1]) content = args[++i];
+    if (args[i] === '--content-file' && args[i + 1]) contentFile = args[++i];
     if (args[i] === '--entry-data' && args[i + 1]) entryData = args[++i];
     if (args[i] === '--pdf-key' && args[i + 1]) pdfKey = args[++i];
     if (args[i] === '--notebook' && args[i + 1]) notebookName = args[++i];
     if (args[i] === '--force') force = true;
   }
+  // --content-file 优先（绕过 bash 变量展开）
+  if (contentFile) {
+    const fileContent = readContentFile(contentFile);
+    if (!fileContent) { console.log(JSON.stringify(createErrorResult('文件读取失败', contentFile))); process.exit(1); }
+    content = fileContent;
+  }
   if (!key || !title) { console.log(JSON.stringify(createErrorResult('参数错误', '需 --key 和 --title'))); process.exit(1); }
+  if (!content) { console.log(JSON.stringify(createErrorResult('参数错误', '需 --content 或 --content-file'))); process.exit(1); }
 
   const literatureKey = `${libId}_${key}`;
   const siyuanUrl = new URL(config.siyuan.baseUrl);

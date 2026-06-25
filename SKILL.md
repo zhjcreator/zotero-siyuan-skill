@@ -95,11 +95,14 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
       未知→L2 文件级
      │
      ▼
-[5] 创建文献笔记（先查重）
-    ├─ lit-note-find.js --key <key>        → 检查是否已存在
-    ├─ 已存在 → 告知用户已有笔记，询问是否覆盖
-    └─ 不存在 → lit-note-create.js --key <key> --title "标题"
-                  --content "<md>" --entry-data "<json>" --pdf-key <pdfKey>
+[5] 创建/更新文献笔记
+    ⚠️ 内容必须通过文件传入，避免 bash 展开 $ 变量破坏公式：
+    1. 将笔记内容写入临时文件: write /tmp/zotero-note-<key>.md
+    2. lit-note-create.js --key <key> --title "标题"
+          --content-file /tmp/zotero-note-<key>.md
+          --entry-data "<json>" --pdf-key <pdfKey>
+
+    注意: 不要用 --content 传内容（bash 会把 $E、$f' 等当变量展开，破坏公式）
      │
      ▼
 [6] 反向标注（可选，用户要求时执行）
@@ -229,7 +232,7 @@ $$
 ```
 
 > **模板要点**：模型架构是核心，必须详细到模块级（backbone/neck/head/损失函数），每项标注页码超链。结果/训练用表格。公式正常写 KaTeX 即可。块级公式前后必须有空行。
-> **图片**：从 MinerU 输出的 Markdown 中提取关键图（架构图、实验结果图），用 `![描述](assets/xxx.png)` 嵌入笔记对应区域。`pdf-to-md.js --siyuan-assets` 已自动复制图片并替换路径。
+> **图片**：从 MinerU 输出的 Markdown 中提取关键图（架构图、实验结果图），用 `![描述](assets/xxx.png)` 嵌入笔记对应区域。`pdf-to-md.js --siyuan-assets` 已自动复制图片并替换路径。如复制后图片不显示，需重启思源使其重新索引 assets 目录。
 
 ---
 
