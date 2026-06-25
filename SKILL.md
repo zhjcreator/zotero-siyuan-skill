@@ -181,17 +181,12 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 ## AI 管理的区域（放在 User Data 内，不会被插件刷新覆盖）
 
 ```markdown
-## User Data
-{: custom-literature-block-type="user data"}
-
-> 以下内容由 AI 生成，不会被插件刷新覆盖。
-
 ### 🔬 研究问题
 [2-3 句话总结]
 
 ### ⚙️ 方法与实验
 [不少于 200 字：架构、训练策略、数据集、评估指标、超参数]
-每项附 [第N页](zotero://...)
+每项附 [第N页](zotero://...) 链接
 
 ### 💡 核心发现
 [每项 1-2 句 + [第N页](zotero://...) 链接]
