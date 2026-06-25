@@ -76,10 +76,9 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
      │
      ▼
 [3] PDF 全文分析 + 图片提取
-    └─ pdf-to-md.js --key <itemKey> --siyuan-assets <思源data/assets路径>
-       JSON 输出 j.data.markdown 含完整论文 Markdown（含图片引用路径已替换为 assets/）
-       j.data.contentPages 提供内容→页码映射
-       图片自动复制到思源 assets 目录，笔记中直接用 assets/xxx.png 引用
+    └─ pdf-to-md.js --key <itemKey> --siyuan-assets
+       图片通过 SiYuan API 自动上传到 ~/SiYuan/assets/
+       j.data.markdown 中图片路径已替换为 assets/xxx.jpg
      │
      ▼
 [4] AI 分析生成笔记内容
