@@ -7,13 +7,12 @@ const crypto = require('crypto');
 const ConfigManager = require('./lib/config');
 const { createErrorResult, createSuccessResult } = require('./lib/result-helper');
 
-/** 上传图片到思源（通过 API，fs.copyFile 不会注册到思源索引） */
 function uploadToSiyuan(baseUrl, token, filePath, fileName) {
   return new Promise((resolve) => {
     const imgData = fs.readFileSync(filePath);
     const boundary = '----SiYuan' + Date.now();
     const header = Buffer.from(
-      `--${boundary}\r\nContent-Disposition: form-data; name="path"\r\n\r\nassets/${fileName}\r\n` +
+      `--${boundary}\r\nContent-Disposition: form-data; name="path"\r\n\r\ndata/assets/${fileName}\r\n` +
       `--${boundary}\r\nContent-Disposition: form-data; name="isDir"\r\n\r\nfalse\r\n` +
       `--${boundary}\r\nContent-Disposition: form-data; name="modTime"\r\n\r\n${Math.floor(Date.now() / 1000)}\r\n` +
       `--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${fileName}"\r\nContent-Type: application/octet-stream\r\n\r\n`
@@ -50,7 +49,6 @@ async function main() {
     process.exit(1);
   }
 
-  // 通过 itemKey 获取 PDF 路径
   if (!pdfPath && itemKey) {
     const ZoteroClient = require('./lib/zotero-client');
     const client = new ZoteroClient(config.zotero.baseUrl);
@@ -86,7 +84,6 @@ async function main() {
   const stat = fs.statSync(pdfPath);
   const fileSizeMB = stat.size / (1024 * 1024);
 
-  // 必须指定输出目录
   if (!outputDir) {
     outputDir = path.join(config.cache.dir, crypto.createHash('md5').update(pdfPath).digest('hex').substring(0, 8));
   }
@@ -101,14 +98,12 @@ async function main() {
     });
     if (result.error) throw result.error;
 
-    // 读取 markdown（文件名为原始 PDF 名）
     let markdown = '';
     const mdFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.md'));
     if (mdFiles.length > 0) {
       markdown = fs.readFileSync(path.join(outputDir, mdFiles[0]), 'utf8');
     }
 
-    // 解析 content_list.json → 内容→页码映射
     let contentPages = [];
     for (const f of fs.readdirSync(outputDir)) {
       if (f.endsWith('.json')) {
@@ -130,7 +125,6 @@ async function main() {
       process.exit(1);
     }
 
-    // 按需上传图片到思源（通过 API，确保思源能识别）
     let imagesCopied = 0;
     let markdownOut = markdown;
     if (siyuanAssets) {
@@ -151,7 +145,7 @@ async function main() {
       pdfPath,
       outputDir,
       contentPages,
-      convertMethod: `mineru-extract`,
+      convertMethod: 'mineru-extract',
       imagesCopied,
       fileSizeMB: Math.round(fileSizeMB * 100) / 100,
       hasPageMapping: contentPages.length > 0

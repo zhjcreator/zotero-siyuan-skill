@@ -13,6 +13,7 @@
   "litNote": {
     "path": "/References",
     "template": "zh",
+    "notebookName": "",
     "autoAppendUserData": true
   },
   "mineru": {

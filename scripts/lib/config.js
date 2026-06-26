@@ -65,6 +65,7 @@ class ConfigManager {
     if (process.env.SIYUAN_DEFAULT_NOTEBOOK) { c.siyuan = c.siyuan || {}; c.siyuan.defaultNotebook = process.env.SIYUAN_DEFAULT_NOTEBOOK; }
     if (process.env.SIYUAN_SKILL_DIR) { c.siyuan = c.siyuan || {}; c.siyuan.skillDir = process.env.SIYUAN_SKILL_DIR; }
     if (process.env.LIT_NOTE_PATH) { c.litNote = c.litNote || {}; c.litNote.path = process.env.LIT_NOTE_PATH; }
+    if (process.env.LIT_NOTE_NOTEBOOK) { c.litNote = c.litNote || {}; c.litNote.notebookName = process.env.LIT_NOTE_NOTEBOOK; }
     if (process.env.LIT_NOTE_TEMPLATE) { c.litNote = c.litNote || {}; c.litNote.template = process.env.LIT_NOTE_TEMPLATE; }
     if (process.env.MINERU_ENABLED !== undefined) { c.mineru = c.mineru || {}; c.mineru.enabled = process.env.MINERU_ENABLED !== 'false'; }
     if (process.env.ZOTERO_SIYUAN_CACHE_DIR) { c.cache = c.cache || {}; c.cache.dir = process.env.ZOTERO_SIYUAN_CACHE_DIR; }

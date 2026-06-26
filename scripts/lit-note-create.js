@@ -110,21 +110,22 @@ async function main() {
 
   // ── 2. 新建文档 ──
   if (!notebookName) {
-    try {
-      const nbOut = await spawnOut('node', [skillDir + '/scripts/notebooks.js']);
-      const nb = JSON.parse(nbOut.trim());
-      const notebooks = nb.notebooks || (nb.data?.notebooks) || [];
-      if (notebooks.length) notebookName = notebooks[0].name;
-    } catch (_) {}
+    console.log(JSON.stringify(createErrorResult('配置错误', '请先设置 litNote.notebookName，或运行 lit-note-init.js --notebook "笔记本名"')));
+    process.exit(1);
   }
-  if (!notebookName) { console.log(JSON.stringify(createErrorResult('配置错误', '无法获取笔记本名称'))); process.exit(1); }
 
   const litPath = config.litNote.path.replace(/^\/+/, '');
   const safeTitle = title.replace(/[/\\:*?"<>|]/g, '_');
   const docPath = `/${notebookName}/${litPath}/${safeTitle}`;
 
   // 新建文档：只写 AI 内容，User Data 由插件管理
-  const createOut = await spawnOut('node', [skillDir + '/scripts/create.js', safeTitle, '--path', docPath, '--content', escapeContent(content)], { timeout: 30000 });
+  const createArgs = [skillDir + '/scripts/create.js', safeTitle, '--path', docPath];
+  if (contentFile) {
+    createArgs.push('--file', contentFile);
+  } else {
+    createArgs.push('--content', escapeContent(content));
+  }
+  const createOut = await spawnOut('node', createArgs, { timeout: 30000 });
   let createRes;
   try { createRes = JSON.parse(createOut.trim()); } catch (e) { throw new Error('解析创建结果失败'); }
   if (!createRes?.success) { console.log(JSON.stringify(createErrorResult('创建失败', createRes?.message || '未知错误'))); process.exit(1); }

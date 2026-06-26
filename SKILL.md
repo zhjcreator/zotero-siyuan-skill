@@ -19,12 +19,9 @@ metadata: {"openclaw":{"emoji":"📚","requires":{"bins":["node","mineru-open-ap
 
 ```bash
 node {baseDir}/scripts/<command>.js [options]
-node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 ```
 
 ## 命令列表
-
-### Zotero 数据获取
 
 | 脚本 | 说明 | 示例 |
 |------|------|------|
@@ -33,95 +30,107 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 | `zotero-items` | 搜索/列出条目 | `node {baseDir}/scripts/zotero-items.js --q "transformer"` |
 | `zotero-notes` | 获取笔记和 PDF 标注 | `node {baseDir}/scripts/zotero-notes.js --key <itemKey>` |
 | `zotero-attachment` | 获取 PDF 附件路径 | `node {baseDir}/scripts/zotero-attachment.js --key <itemKey>` |
-
-### PDF 处理
-
-| 脚本 | 说明 | 示例 |
-|------|------|------|
 | `pdf-to-md` | PDF→Markdown | `node {baseDir}/scripts/pdf-to-md.js --key <itemKey> --siyuan-assets` |
-| | | `--siyuan-assets` 不传值或传 `auto` 时自动从 SiYuan API 发现 assets 路径；也可手动指定路径 |
+| `siyuan-upload-images` | 上传图片到思源 | `node {baseDir}/scripts/siyuan-upload-images.js --dir <outputDir> --file "img1,img2"` |
 | `zotero-write-annotation` | 创建 PDF 标注 | `node {baseDir}/scripts/zotero-write-annotation.js --pdf-key <key> --page <n> --comment "<html>"` |
-
-### 文献笔记操作
-
-| 脚本 | 说明 | 示例 |
-|------|------|------|
+| `lit-note-init` | 初始化笔记本配置 | `node {baseDir}/scripts/lit-note-init.js --notebook "文献库"` |
 | `lit-note-find` | 查找文献笔记 | `node {baseDir}/scripts/lit-note-find.js --key <itemKey>` |
-| `lit-note-create` | 创建文献笔记 | `node {baseDir}/scripts/lit-note-create.js --key <itemKey> --title "标题" --content "<md>" --content-file <path> --entry-data "<json>"` |
-| | | `--content-file` 从文件读取内容，彻底避免 bash 转义问题，推荐在公式密集时使用 |
-| `lit-note-append` | 追加内容 | `node {baseDir}/scripts/lit-note-append.js --doc-id <id> --section "User Data" --content "<md>"` |
-
-### AI 辅助
-
-| 脚本 | 说明 | 示例 |
-|------|------|------|
+| `lit-note-create` | 创建文献笔记 | `node {baseDir}/scripts/lit-note-create.js --key <itemKey> --title "标题" --content-file <path> --notebook "<名称>" --entry-data "<json>" --pdf-key <pdfKey>` |
+| `lit-note-append` | 追加内容 | `node {baseDir}/scripts/lit-note-append.js --doc-id <id> --section "User Data" --content "<md>" --mode append\|replace` |
 | `ask-supplement` | 补充判断 | `node {baseDir}/scripts/ask-supplement.js --question "..." --note-content "..." --paper-title "..."` |
+
+`lit-note-create` **必须用 `--content-file`**（内置读文件，彻底避免 shell 对 `$$` 和 `\` 的转义）。**严禁 `--content`**。
 
 ---
 
-# 关键规则
+# 主流程：生成论文笔记
 
-## 工作流：生成论文笔记
+## ⚠️ 角色分工（违反即流程失败）
+
+- **主 agent**：读 config、调 Zotero API、运行 pdf-to-md、启动子 agent、校验输出、调用 lit-note-create
+- **子 agent**：必须用 `task` 工具启动专用 `zotero-note-writer` 子 agent，读论文 Markdown、分析全文、生成笔记正文
+- **主 agent 绝对禁止自己在上下文中读/分析论文全文** — 这会导致上下文膨胀且遗漏规则
+
+## ⚠️ 前置检查（步骤 [0]，必须先执行）
+
+在获取任何 Zotero 数据之前，先执行以下检查：
+
+1. **读取 `config.json`** 的 `litNote.notebookName`
+2. 若值为空 → **中止流程**，告知用户：
+   ```
+   笔记目标笔记本未配置。请在 config.json 中设置 litNote.notebookName，或运行：
+   node {baseDir}/scripts/lit-note-init.js --notebook "笔记本名"
+   ```
+3. 若值不为空 → 记录 `{notebookName}`，后续所有操作使用此值，**严禁覆盖**
+
+## 步骤
 
 ```
 用户："为这篇论文生成笔记"
      │
      ▼
-[1] 确定目标论文：用户指定 itemKey 或从最近条目中确认
-    └─ zotero-items.js --limit 5  # 列出最近条目
+[0] 前置：读 config.json → 确认 litNote.notebookName 非空 → 记为 {notebookName}
+    若为空 → 中止并引导配置
      │
      ▼
-[2] 获取元数据和附件
-    ├─ zotero-item.js --key <key>         → title, authors, doi, pdfKey...
-    ├─ zotero-notes.js --key <key>        → PDF 标注（按颜色分组）
-    └─ zotero-attachment.js --key <key>   → PDF 本地路径
+[1] 确定目标论文：用户指定 itemKey 或从最近条目确认
+    └─ zotero-items.js --limit 5
      │
      ▼
-[3] PDF 全文分析
-    └─ pdf-to-md.js --key <itemKey>
-       j.data.markdown 含完整 Markdown（图片路径为 images/xxx.jpg）
-       j.data.contentPages 提供内容→页码映射
-       可选 --siyuan-assets auto：自动发现并复制图片到 SiYuan assets（一步到位）
-
-[4] AI 分析 + 选图
-    生成笔记时，从 Markdown 中选择关键图（架构图、实验结果），
-    记录其文件名（如 images/015da6...jpg → 015da6...jpg）
-
-[4.5] 按需上传图片
-    └─ siyuan-upload-images.js --dir <mineru-output> --file "img1,img2"
-       通过 SiYuan API 上传，自动存入正确的 assets 目录
-       只上传笔记中引用的图片，笔记中引用路径为 assets/xxx.jpg
+[2] 并行获取元数据（同一轮 tool call 同时发起 3 个 bash）
+    ├─ zotero-item.js --key <key>       → title, authors, year, doi, abstract, pdfKey
+    ├─ zotero-notes.js --key <key>      → PDF 标注（按颜色分组，含 zoteroOpenURI）
+    └─ zotero-attachment.js --key <key> → PDF 本地路径
      │
      ▼
-[4] AI 分析生成笔记内容
-    输入：元数据 + Markdown 全文 + PDF 标注列表
-    输出：结构化 Markdown（遵循下方模板）
-
-    标注按颜色归类：
-    🟡黄色→核心发现 | 🔴红色→关键引文 | 🔵蓝色→方法 | 🟣紫色→思考 | 📝批注→关键引文
-
-    每个要点根据精度选择超链：
-      有标注→L4 标注级 ?page=N&annotation=KEY
-      知页码→L3 页码级 ?page=N
-      未知→L2 文件级
+[3] PDF 全文分析 + 图片上传
+    └─ pdf-to-md.js --key <itemKey> --siyuan-assets
+       j.data.outputDir    → MinerU 输出目录
+       j.data.contentPages → 内容→页码映射
+       j.data.imagesCopied → 上传成功的图片数
+       记录：mdPath = <outputDir>/<md文件名>，imgDir = <outputDir>/images/
      │
      ▼
-[5] 创建/更新文献笔记
-    ⚠️ 内容必须通过文件传入，避免 bash 展开 $ 变量破坏公式：
-    1. 将笔记内容写入临时文件: write /tmp/zotero-note-<key>.md
-    2. lit-note-create.js --key <key> --title "标题"
-          --content-file /tmp/zotero-note-<key>.md
-          --entry-data "<json>" --pdf-key <pdfKey>
+[4] 启动子 agent 生成笔记
+    使用 task 工具 + subagent_type='zotero-note-writer' + description="生成论文笔记"
 
-    注意: 不要用 --content 传内容（bash 会把 $E、$f' 等当变量展开，破坏公式）
+    专用子 agent 的 prompt 前部已经内置稳定的模板和格式要求，用于命中缓存。
+    主 agent 只传动态载荷，严禁把模板或格式规范复制进本轮上下文：
+
+       论文路径：{mdPath}
+       图片目录：{imgDir}
+       元数据文件：/tmp/zotero-meta-<key>.json
+       标注文件：/tmp/zotero-annotations-<key>.json
+       页码映射文件：/tmp/zotero-pages-<key>.json
+       PDF Key：{pdfKey}
+       输出纯 Markdown 正文，无前缀后缀。
+
+    子 agent 输出 → 笔记正文（纯 Markdown）
      │
      ▼
+[5] 校验子 agent 输出
+
+     1. write /tmp/zotero-note-<key>.md（写入子 agent 输出）
+     2. 主 agent 只做创建前安全检查：输出非空、没有解释性前后缀、body 不含 `# 标题`、使用 `--content-file`
+     3. 若怀疑模板或格式不合格，仍交回 `zotero-note-writer` 子 agent 自检并重修；主 agent 不复制模板/格式细则
+     4. 全部通过后执行：
+       lit-note-create.js --key <key> --title "{title}"
+         --content-file /tmp/zotero-note-<key>.md
+         --notebook "{notebookName}"
+         --entry-data "<json>" --pdf-key <pdfKey>
+      │
+      ▼
 [6] 反向标注（可选，用户要求时执行）
-    └─ zotero-write-annotation.js --pdf-key <pdfKey> --page <n>
-         --comment "<p>核心发现...<br/><a href='siyuan://blocks/<docId>'>打开思源笔记</a></p>"
+    └─ zotero-write-annotation.js --pdf-key <pdfKey> --page <n> --comment "..."
 ```
 
-## 工作流：Q&A 智能补充（TODO 驱动）
+> 笔记模板和格式规范不写入主 agent 上下文。它们内置在 `.opencode/agents/zotero-note-writer.md` 的 prompt 前部，历史副本保存在 `{baseDir}/references/note-generation.md` 便于维护。
+
+**内容传参**：严禁 `--content "..."`（bash 展开 `$$` → PID），必须 `--content-file`（`lit-note-create.js` 内置支持）。
+
+---
+
+# Q&A 智能补充（TODO 驱动）
 
 ```
 用户提问
@@ -132,20 +141,13 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
     返回: { shouldSupplement, targetSection, targetIsTODO, fillAction, suggestion }
      │
      ▼
-[2] 告知用户
-    "这个回答涉及「{targetSection}」，该区域当前是 [待补充]。
-     要补充到笔记吗？[y]"
-     │
-     ▼
-[3] 用户确认 → 定位 + 填充
-    ├─ lit-note-find.js --key <key>
-    ├─ 生成 markdown 内容
-    └─ lit-note-append.js --doc-id <id>
-         --section "<targetSection>"
-         --content "<md>"
-         --mode replace|append
-     │
-     ▼
+[2] 告知用户 → 确认
+      │
+      ▼
+[3] 定位 + 填充
+    lit-note-append.js --doc-id <id> --section "<targetSection>" --content "<md>" --mode replace|append
+      │
+      ▼
 [4] 确认已填充
 
 判断标准:
@@ -153,133 +155,6 @@ node {baseDir}/scripts/<command>.js --help  # 查看命令帮助
 ❌ 不补充：纯事实查询 | 已在笔记中 | 与当前论文无关
 ⚠️ 询问：不确定时，给出建议让用户选择
 ```
-
----
-
-# 笔记模板与区域分工
-
-## 插件管理的区域（siyuan-plugin-citation 自动生成和刷新）
-
-这部分由插件管理，**我们不应该手动创建或修改**。当用户通过插件插入引用后，插件自动生成：
-
-```markdown
----
-
-**Title**:	{{title}}
-
-**Author**:	{{authorString}}
-
-**Year**:	{{year}}
-
----
-
-# 📌 Abstract
-
-{{abstract}}
-
-# 📂 Select on Zotero
-
-[在 Zotero 中定位]({{zoteroSelectURI}})
-
-# 📎 Files
-
-{{files}}
-
-# 📝 Zotero Notes
-
-{{note}}
-```
-
-> 插件刷新时会覆盖以上内容，保留 User Data 区域不变。
-
-## AI 管理的区域（放在 User Data 内，AI/ML 论文专用模板）
-
-```markdown
-### 🎯 一句话总结
-[用一句话概括这篇论文的核心贡献，20 字以内]
-
-### ❓ 拟解决问题
-[本文要解决的具体问题是什么？2-3 句话，明确问题的现状和 gap]
-
-### 💡 动机
-[为什么要做这个工作？背后的驱动力是什么？与已有方法的本质区别在哪？]
-
-### 🏗️ 模型架构
-**名称**：[模型名称，如 Veritas]
-**整体框架**：[pipeline/end-to-end/two-stage 等，结构图用文字描述]
-**核心组件**（每个附 [第N页](zotero://...) 链接）：
-
-- **Backbone**：[ViT-B/16, CLIP 等]，输入尺寸/通道 [第N页](zotero://...)
-- **架构图**：
-**Figure 2: Model Architecture** [第N页](zotero://...)
-![整体架构图](assets/xxx.jpg)
-- **特征提取**：[关键模块1]：[作用 + 输入输出维度] [第N页]
-- **核心创新模块**：[注意力机制/Adapter/LoRA 等]：[详细设计，不少于 80 字] [第N页]
-- **Head/解码器**：[分类头/检测头/生成头]：[输出维度，激活函数]
-- **损失函数**：
-
-$$
-\mathcal{L} = \mathcal{L}_{1} + \lambda \mathcal{L}_{2}
-$$
-各分项含义：[...]
-
-**参数量/计算量**：[#params, FLOPs, 推理速度]
-
-### 📊 训练策略
-- **数据集**：[名称, 规模, 来源] [第N页]
-- **预处理**：[图像尺寸, 归一化, 增强方法]
-- **优化器**：[AdamW/SGD], lr=[], batch_size=[], epochs=[]
-- **学习率调度**：[cosine/step/warmup]
-- **正则化**：[dropout, weight decay, label smoothing]
-- **硬件/时间**：[GPU 型号, 训练时长]
-
-### 📈 核心结果
-| 任务 | 数据集 | 指标 | 本文 | SOTA | [第N页] |
-|------|--------|------|------|------|------|
-| ... | ... | ... | ... | ... | [第N页] |
-
-**关键消融**：[哪些模块贡献最大] [第N页]
-
-### 🔍 关键引文
-> "原文引用"
-> — [第N页](zotero://...)
-
-### 🤔 思考与疑问
-- 优点：[...]
-- 局限：[...]
-- 可借鉴点：[...]
-- 疑问：[...]
-```
-
-> **模板要点**：模型架构是核心，必须详细到模块级（backbone/neck/head/损失函数），每项标注页码超链。结果/训练用表格。公式正常写 KaTeX 即可。块级公式前后必须有空行。
-> **图片**：从 MinerU Markdown 中选关键图 → 用 `siyuan-upload-images.js --dir <out> --file "img1,img2"` 按需上传 → 笔记中引用格式：
-> ```
-> **Figure N: 标题** [第N页](zotero://open-pdf/...)
-> ![描述](assets/xxx.jpg)
-> ```
-
----
-
-# 格式规范（继承 siyuan-skill）
-
-| 场景 | 正确格式 | 错误格式 |
-|------|---------|---------|
-| 内部链接 | `((id "锚文本"))` | `[文本](id)` ❌ |
-| 换行 | `\\n` | 直接换行 |
-| 段落分隔 | `\\n\\n` | 单个 \\n |
-| 文档标题 | 通过 create.js 传参 | `# 标题` 写在 body ❌ |
-
-> 完整规范参考 siyuan-skill 的 format-standard.md
-
----
-
-# 补充判断标准
-
-| 应补充 | 不补充 | 询问用户 |
-|--------|--------|---------|
-| 用户说"记下来""补充" | 纯事实查询（发表年/作者） | 不确定是否相关 |
-| 新理解/分析/总结 | 操作性问题（怎么打开） | 内容可能有争议 |
-| 论文间关联发现 | 笔记中已有相同内容 | 涉及个人观点 |
 
 ---
 
@@ -300,10 +175,11 @@ $$
 
 | 错误 | 处理 |
 |------|------|
-| Zotero 未运行 | 提示用户：启动 Zotero 并确保 Settings → Advanced → Allow local API 已启用 |
-| MinerU 未安装 | 提示：`npm install -g mineru-open-api` |
-| PDF 超 10MB | 提示：改用 `mineru-open-api extract`（需 token）或仅用元数据生成笔记 |
-| 文献笔记已存在 | 告知 docId，询问是打开阅读还是覆盖重建 |
+| Zotero 未运行 | 提示启动 Zotero 并启用 Settings → Advanced → Allow local API |
+| MinerU 未安装 | `npm install -g mineru-open-api` |
+| MinerU 认证失败 | `mineru-open-api auth`，注册: https://mineru.net/apiManage/token |
+| 公式被 shell 破坏 | 检查是否误用 `--content`，改用 `--content-file` |
+| 文献笔记已存在 | 告知 docId，询问打开阅读还是覆盖重建 |
 | 无 PDF 附件 | 仅基于元数据和 Zotero 笔记生成基础笔记 |
 | 无标注 | 降级为 L2/L3 链接，无反向标注 |
 
@@ -311,22 +187,34 @@ $$
 
 # 配置
 
-所有配置项均为可选，脚本会自动从常见路径发现依赖和默认值。
+所有配置项均可选，脚本自动从常见路径发现。
 
 **依赖**: [siyuan-skill](https://github.com/dazexcl/siyuan-skill) — 自动从以下路径发现：
-- `../siyuan-skill`（本 skill 同级目录）
+- `../siyuan-skill`
 - `~/.config/opencode/skills/siyuan-skill`
 - `~/WorkSpace/Skills/siyuan-skill`
 
-**SIYUAN_DEFAULT_NOTEBOOK**: 自动调用 `siyuan-skill/scripts/notebooks.js` 获取，默认使用第一个笔记本。
+**SIYUAN_DEFAULT_NOTEBOOK**: 自动调用 `siyuan-skill/scripts/notebooks.js` 获取，默认第一个笔记本。
 
-**SIYUAN_TOKEN**: 可选。思源未设置访问鉴权时无需配置。如需指定：
+**litNote.notebookName**: `config.json` 中配置目标笔记本（如 `"文献库"`）。**首次使用前必须设置**，否则工作流步骤 [0] 中止。
+
+配置方式：
 ```bash
-export SIYUAN_TOKEN="your-token"
+# 方式一：初始化脚本
+node {baseDir}/scripts/lit-note-init.js --notebook "文献库"
+
+# 方式二：直接编辑 config.json
+{
+  "litNote": { "notebookName": "文献库" }
+}
 ```
 
-**覆盖默认端口/地址**：
+**内容传参**：`lit-note-create.js` 支持 `--content-file <path>` 直接读文件。写入 `/tmp/zotero-note-<key>.md` 后传入路径即可。
+
+**SIYUAN_TOKEN**: 可选。如需指定：`export SIYUAN_TOKEN="your-token"`
+
+**覆盖端口/地址**：
 ```bash
-export SIYUAN_BASE_URL="http://localhost:6808"  # 如端口非 6806
+export SIYUAN_BASE_URL="http://localhost:6808"
 export ZOTERO_BASE_URL="http://localhost:23119"
 ```
