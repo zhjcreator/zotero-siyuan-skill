@@ -22,6 +22,7 @@ class SiyuanBridge {
   async setBlockAttrs(docId, attrs) { const a = []; for (const [k,v] of Object.entries(attrs)) a.push('--set', `${k}=${v}`); return this._run('block-attrs.js', [docId, ...a]); }
   async getContent(docId) { return this._run('content.js', [docId]); }
   async insertBlock(content, parentId) { return this._run('block-insert.js', [escapeContent(content), '--parent-id', parentId]); }
+  async updateDoc(docId, content) { return this._run('update.js', [docId, '--content', escapeContent(content)]); }
   async updateBlock(blockId, content) { return this._run('block-update.js', [blockId, '--content', escapeContent(content)]); }
   async searchContent(query, mode = 'keyword') { return this._run('search.js', [query, '--mode', mode]); }
   async getInfo(docId) { return this._run('info.js', [docId]); }

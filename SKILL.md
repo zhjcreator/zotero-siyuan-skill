@@ -36,7 +36,7 @@ node {baseDir}/scripts/<command>.js [options]
 | `lit-note-init` | 初始化笔记本配置 | `node {baseDir}/scripts/lit-note-init.js --notebook "文献库"` |
 | `lit-note-find` | 查找文献笔记 | `node {baseDir}/scripts/lit-note-find.js --key <itemKey>` |
 | `lit-note-create` | 创建文献笔记 | `node {baseDir}/scripts/lit-note-create.js --key <itemKey> --title "标题" --content-file <path> --notebook "<名称>" --entry-data "<json>" --pdf-key <pdfKey>` |
-| `lit-note-append` | 追加内容 | `node {baseDir}/scripts/lit-note-append.js --doc-id <id> --section "User Data" --content "<md>" --mode append\|replace` |
+| `lit-note-append` | 追加/替换内容 | `node {baseDir}/scripts/lit-note-append.js --doc-id <id> --section "User Data" --content-file <path> --mode append\|replace --scope section\|document` |
 | `ask-supplement` | 补充判断 | `node {baseDir}/scripts/ask-supplement.js --question "..." --note-content "..." --paper-title "..."` |
 
 `lit-note-create` **必须用 `--content-file`**（内置读文件，彻底避免 shell 对 `$$` 和 `\` 的转义）。**严禁 `--content`**。
@@ -85,10 +85,12 @@ node {baseDir}/scripts/<command>.js [options]
      ▼
 [3] PDF 全文分析 + 图片上传
     └─ pdf-to-md.js --key <itemKey> --siyuan-assets
-       j.data.outputDir    → MinerU 输出目录
-       j.data.contentPages → 内容→页码映射
-       j.data.imagesCopied → 上传成功的图片数
-       记录：mdPath = <outputDir>/<md文件名>，imgDir = <outputDir>/images/
+       j.data.outputDir          → MinerU 输出目录
+       j.data.mdPath             → 论文 Markdown 文件路径（全文只落盘，不进 stdout）
+       j.data.contentPagesPath   → 内容→页码映射 JSON 文件
+       j.data.imageManifestPath  → 图片清单/路径映射 JSON 文件
+       j.data.imagesCopied       → 上传成功的图片数
+       记录：mdPath、imgDir = <outputDir>/images/、contentPagesPath、imageManifestPath
      │
      ▼
 [4] 启动子 agent 生成笔记
@@ -101,7 +103,8 @@ node {baseDir}/scripts/<command>.js [options]
        图片目录：{imgDir}
        元数据文件：/tmp/zotero-meta-<key>.json
        标注文件：/tmp/zotero-annotations-<key>.json
-       页码映射文件：/tmp/zotero-pages-<key>.json
+       页码映射文件：{contentPagesPath}
+       图片清单文件：{imageManifestPath}
        PDF Key：{pdfKey}
        输出纯 Markdown 正文，无前缀后缀。
 
@@ -145,7 +148,7 @@ node {baseDir}/scripts/<command>.js [options]
       │
       ▼
 [3] 定位 + 填充
-    lit-note-append.js --doc-id <id> --section "<targetSection>" --content "<md>" --mode replace|append
+    lit-note-append.js --doc-id <id> --section "<targetSection>" --content-file <path> --mode replace|append --scope section
       │
       ▼
 [4] 确认已填充

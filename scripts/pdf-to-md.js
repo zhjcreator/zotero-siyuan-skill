@@ -28,6 +28,11 @@ function uploadToSiyuan(baseUrl, token, filePath, fileName) {
   });
 }
 
+function listImageFiles(dir) {
+  if (!fs.existsSync(dir)) return [];
+  return fs.readdirSync(dir).filter(f => /\.(png|jpg|jpeg|gif|svg|webp)$/i.test(f));
+}
+
 async function main() {
   const args = process.argv.slice(2);
   const config = new ConfigManager().get();
@@ -99,9 +104,11 @@ async function main() {
     if (result.error) throw result.error;
 
     let markdown = '';
+    let mdPath = '';
     const mdFiles = fs.readdirSync(outputDir).filter(f => f.endsWith('.md'));
     if (mdFiles.length > 0) {
-      markdown = fs.readFileSync(path.join(outputDir, mdFiles[0]), 'utf8');
+      mdPath = path.join(outputDir, mdFiles[0]);
+      markdown = fs.readFileSync(mdPath, 'utf8');
     }
 
     let contentPages = [];
@@ -127,26 +134,45 @@ async function main() {
 
     let imagesCopied = 0;
     let markdownOut = markdown;
+    const imgDir = path.join(outputDir, 'images');
+    const imgRoot = fs.existsSync(imgDir) ? imgDir : outputDir;
+    const imgFiles = listImageFiles(imgRoot);
+    const uploadedImages = new Set();
     if (siyuanAssets) {
-      const imgDir = path.join(outputDir, 'images');
-      const imgRoot = fs.existsSync(imgDir) ? imgDir : outputDir;
-      const imgFiles = fs.readdirSync(imgRoot).filter(f => /\.(png|jpg|jpeg|gif|svg|webp)$/i.test(f));
       for (const f of imgFiles) {
         const res = await uploadToSiyuan(config.siyuan.baseUrl, config.siyuan.token, path.join(imgRoot, f), f);
         if (res.code === 0) {
           markdownOut = markdownOut.replace(new RegExp(`images/${f.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'), `assets/${f}`);
+          uploadedImages.add(f);
           imagesCopied++;
         }
       }
     }
 
+    if (markdownOut !== markdown) fs.writeFileSync(mdPath, markdownOut, 'utf8');
+    const contentPagesPath = path.join(outputDir, 'content-pages.json');
+    fs.writeFileSync(contentPagesPath, JSON.stringify(contentPages, null, 2) + '\n', 'utf8');
+    const imageManifest = imgFiles.map(file => ({
+      file,
+      localPath: path.join(imgRoot, file),
+      markdownPath: siyuanAssets && uploadedImages.has(file) ? `assets/${file}` : (imgRoot === imgDir ? `images/${file}` : file),
+      uploaded: uploadedImages.has(file),
+      referencedInMarkdown: markdownOut.includes(file)
+    }));
+    const imageManifestPath = path.join(outputDir, 'image-manifest.json');
+    fs.writeFileSync(imageManifestPath, JSON.stringify(imageManifest, null, 2) + '\n', 'utf8');
+
     console.log(JSON.stringify(createSuccessResult({
-      markdown: siyuanAssets ? markdownOut : markdown,
       pdfPath,
       outputDir,
-      contentPages,
+      mdPath,
+      contentPagesPath,
+      contentPageCount: contentPages.length,
+      imageManifestPath,
+      imageCount: imageManifest.length,
       convertMethod: 'mineru-extract',
       imagesCopied,
+      markdownChars: markdownOut.length,
       fileSizeMB: Math.round(fileSizeMB * 100) / 100,
       hasPageMapping: contentPages.length > 0
     })));
